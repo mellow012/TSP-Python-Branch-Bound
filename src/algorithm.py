@@ -1,11 +1,13 @@
 """
 Branch and Bound Algorithm for TSP
 Implements the core solving logic using Branch and Bound approach
+Now with statistics tracking for analysis
 """
 
 import numpy as np
 from queue import PriorityQueue
 import sys
+import time
 from src.utilities import calculate_distance
 
 class Node:
@@ -24,7 +26,7 @@ class Node:
 
 
 class BranchAndBoundTSP:
-    """Branch and Bound solver for Traveling Salesman Problem"""
+    """Branch and Bound solver for Traveling Salesman Problem with statistics"""
     
     def __init__(self, cities):
         """
@@ -38,6 +40,21 @@ class BranchAndBoundTSP:
         self.distance_matrix = self.create_distance_matrix()
         self.best_cost = float('inf')
         self.best_path = []
+        
+        # Statistics tracking
+        self.nodes_explored = 0
+        self.branches_pruned = 0
+        self.max_depth_reached = 0
+        self.start_time = 0
+        self.end_time = 0
+        self.computation_time = 0
+        
+        # For progress tracking
+        self.callback = None
+    
+    def set_progress_callback(self, callback):
+        """Set callback function for progress updates"""
+        self.callback = callback
     
     def create_distance_matrix(self):
         """Create distance matrix from city coordinates"""
@@ -112,6 +129,17 @@ class BranchAndBoundTSP:
         # Total cost = current + edge + reduction
         return current_cost + matrix[src][dest] + reduction_cost
     
+    def update_statistics(self):
+        """Update statistics and call progress callback if set"""
+        if self.callback:
+            stats = {
+                'nodes_explored': self.nodes_explored,
+                'branches_pruned': self.branches_pruned,
+                'best_cost': self.best_cost if self.best_cost != float('inf') else None,
+                'max_depth': self.max_depth_reached
+            }
+            self.callback(stats)
+    
     def solve(self):
         """
         Solve TSP using Branch and Bound algorithm
@@ -119,6 +147,16 @@ class BranchAndBoundTSP:
         Returns:
             Tuple of (best_path, best_cost)
         """
+        # Reset statistics
+        self.nodes_explored = 0
+        self.branches_pruned = 0
+        self.max_depth_reached = 0
+        self.best_cost = float('inf')
+        self.best_path = []
+        
+        # Start timing
+        self.start_time = time.time()
+        
         # Initialize with reduced matrix
         reduced_matrix, initial_cost = self.reduce_matrix(self.distance_matrix)
         
@@ -141,6 +179,20 @@ class BranchAndBoundTSP:
         while not pq.empty():
             _, _, current = pq.get()
             
+            # Update statistics
+            self.nodes_explored += 1
+            if current.level > self.max_depth_reached:
+                self.max_depth_reached = current.level
+            
+            # Periodic progress update (every 100 nodes)
+            if self.nodes_explored % 100 == 0:
+                self.update_statistics()
+            
+            # If current node's cost is already worse than best, prune it
+            if current.cost >= self.best_cost:
+                self.branches_pruned += 1
+                continue
+            
             # If we've visited all cities
             if current.level == self.n - 1:
                 # Complete the tour by returning to start
@@ -150,6 +202,7 @@ class BranchAndBoundTSP:
                 if total_cost < self.best_cost:
                     self.best_cost = total_cost
                     self.best_path = current.path + [0]
+                    self.update_statistics()
                 
                 continue
             
@@ -184,9 +237,35 @@ class BranchAndBoundTSP:
                         )
                         
                         pq.put((new_node.cost, id(new_node), new_node))
+                    else:
+                        # This branch was pruned
+                        self.branches_pruned += 1
+        
+        # End timing
+        self.end_time = time.time()
+        self.computation_time = self.end_time - self.start_time
+        
+        # Final statistics update
+        self.update_statistics()
         
         # Return path without the final return to start for visualization
         return self.best_path[:-1], self.best_cost
+    
+    def get_statistics(self):
+        """
+        Get solving statistics
+        
+        Returns:
+            Dictionary with statistics
+        """
+        return {
+            'nodes_explored': self.nodes_explored,
+            'branches_pruned': self.branches_pruned,
+            'max_depth_reached': self.max_depth_reached,
+            'computation_time': self.computation_time,
+            'best_cost': self.best_cost,
+            'pruning_efficiency': (self.branches_pruned / max(self.nodes_explored, 1)) * 100
+        }
     
     def get_tour_distance(self, path):
         """
