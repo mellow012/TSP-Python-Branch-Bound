@@ -8,7 +8,7 @@ A Python-based GUI application that solves the Traveling Salesman Problem (TSP) 
 **Module:** Comprehension (351 CP 81)  
 **Algorithm:** Branch and Bound  
 **Language:** Python  
-**Author:** [Your Name]  
+**Author:** Wisdom Mellow Mlambia  
 **Date:** October 2025
 
 ## Description
